@@ -415,6 +415,16 @@ class Finder:
 
                 # will open the fb carousel and get all the images
                 driver.set_window_size(1920, 1200)
+                try:
+                    parent_element = images[-1].find_element(By.XPATH,
+                                                               "./ancestor::a")
+                    last_image_count = parent_element.find_element(By.XPATH,
+                                                               "..//div[contains(text(), '+')]")
+                    max_images_count = len(images) + int(last_image_count.text.strip("+"))
+                    print(f"image count is {max_images_count}")
+                except Exception as exce:
+                    max_images_count = 10
+                    print(exce)
                 first_url_element = images[0].find_element_by_xpath("./ancestor::a")
                 try:
                     driver.execute_script("arguments[0].scrollIntoView();", first_url_element)
@@ -442,7 +452,7 @@ class Finder:
                         img_element)
                 image_src = []
 
-                while next_button != None:
+                while (next_button is not None) & (len(image_src) < max_images_count):
                     try:
                         print("waiting for the image to render")
                         time.sleep(2)
