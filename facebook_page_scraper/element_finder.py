@@ -5,10 +5,12 @@ import re
 import sys
 import time
 import urllib.request
+from urllib.parse import urlparse, parse_qs
 
 import dateutil
 from dateutil.parser import parse
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -396,6 +398,100 @@ class Finder:
         return sources
 
     @staticmethod
+    def __find_all_image_url(post, layout, driver):
+        """finds all image of the facebook post using selenium's webdriver's method"""
+        try:
+            if layout == "old":
+                # find all img tag that looks like <img class="scaledImageFitWidth img" src=""> div > img[referrerpolicy]
+                images = post.find_elements(
+                    By.CSS_SELECTOR, "img.scaledImageFitWidth.img"
+                )
+                # extract src attribute from all the img tag,store it in list
+            elif layout == "new":
+                post_id = None
+                images = post.find_elements(
+                    By.CSS_SELECTOR, "div > img[referrerpolicy]"
+                )
+
+                # will open the fb carousel and get all the images
+                driver.set_window_size(1920, 1200)
+                first_url_element = images[0].find_element_by_xpath("./ancestor::a")
+                try:
+                    driver.execute_script("arguments[0].scrollIntoView();", first_url_element)
+                    ActionChains(driver).move_to_element_with_offset(first_url_element, 0, 0).click().perform()
+                except:
+                    first_url_element = first_url_element.find_element(By.XPATH, '..')
+                    first_url_element.click()
+
+                image_carousel_wrapper = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Photo Viewer"]')))
+                next_button = image_carousel_wrapper.find_element(
+                    By.XPATH, '//div[@data-name="media-viewer-nav-container"]//div[@data-visualcompletion]'
+                )
+
+                if image_carousel_wrapper:
+                    if post_id is None:
+                        parsed_url = urlparse(driver.current_url)
+                        # Get the query parameters as a dictionary
+                        query_params = parse_qs(parsed_url.query)
+                        # Get the value of the 'fbid' query parameter
+                        post_id = query_params.get('fbid', [None])[0]
+
+                def is_image_loaded(driver, img_element):
+                    return driver.execute_script(
+                        "return arguments[0].complete && typeof arguments[0].naturalWidth != 'undefined' && arguments[0].naturalWidth > 0",
+                        img_element)
+                image_src = []
+
+                while next_button != None:
+                    try:
+                        print("waiting for the image to render")
+                        time.sleep(2)
+                        try:
+                            image = image_carousel_wrapper.find_element(
+                                By.XPATH, '//img[@data-visualcompletion]',
+                            )
+                        except:
+                            time.sleep(10)
+                            image = image_carousel_wrapper.find_element(
+                                By.XPATH, '//img[@data-visualcompletion]',
+                            )
+
+                        if image.get_attribute('src') in image_src:
+                            next_button = None
+                            break
+                        WebDriverWait(driver, 30).until(lambda driver: is_image_loaded(driver, image))
+                        images.append(image)
+                        image_src.append(image.get_attribute('src'))
+                        print(f"image url : {image.get_attribute('src')}")
+                        carousel_buttons = image_carousel_wrapper.find_elements(
+                            By.XPATH, '//div[@data-name="media-viewer-nav-container"]//div[@data-visualcompletion]'
+                        )
+                        if (len(carousel_buttons) > 1):
+                            next_button = carousel_buttons[1]
+                            ActionChains(driver).move_to_element(next_button).click().perform()
+                            WebDriverWait(driver, 30).until(
+                                EC.presence_of_element_located((By.XPATH, '//img[@data-visualcompletion]')))
+                        else:
+                            next_button = None
+                    except Exception as exp:
+                        print(exp)
+                        return [image.get_attribute("src") for image in images] if len(images) > 0 else []
+                return {
+                    'images': image_src,
+                    'post_id': post_id
+                }
+
+
+        except NoSuchElementException:
+            sources = []
+            pass
+        except Exception as ex:
+            logger.exception("Error at find_image_url method : {}".format(ex))
+            sources = []
+
+        return sources
+
+    @staticmethod
     def __find_all_posts(driver, layout, isGroup):
         """finds all posts of the facebook page using selenium's webdriver's method"""
         try:
@@ -426,15 +522,19 @@ class Finder:
 
         try:
             if layout == "old":
-                name = driverOrPost.find_element(By.CSS_SELECTOR, "a._64-f").get_attribute(
-                    "textContent"
-            )
+                name = driverOrPost.find_element(By.CSS_SELECTOR, "a._64-f")
             elif layout == "new":
-                name = driverOrPost.find_element(By.TAG_NAME, "strong").get_attribute(
+                name = driverOrPost.find_element(By.TAG_NAME, "strong")
+            url = None
+            if name is not None:
+                url_elem = name.find_element(By.XPATH, "./ancestor::a")
+                url = url_elem.get_attribute('href')
+            return {
+                'name' : name.get_attribute(
                     "textContent"
-                )
-
-            return name
+                ),
+                'url': url
+            }
         except Exception as ex:
             logger.exception("Error at __find_name method : {}".format(ex))
 

@@ -318,14 +318,16 @@ class Facebook_scraper:
 
                     video = Finder._Finder__find_video_url(post)
 
-                image = Finder._Finder__find_image_url(post, self.__layout)
+                image = Finder._Finder__find_all_image_url(post, self.__layout, self.__driver)
 
                 # post_url = "https://www.facebook.com/{}/posts/{}".format(self.page_or_group_name,status)
 
                 self.__data_dict[status] = {
-                    "name": name,
+                    "name": name.get('name'),
+                    "user_url": name.get('url'),
                     "content": post_content,
-                    "images": image,
+                    "images": image.get('images'),
+                    "post_id": image.get('post_id'),
                     "post_url": post_url,
                     # NOTE only include the following fields if scraping a page, not tested for groups yet
                     **({"shares": shares} if not self.isGroup else {}),
