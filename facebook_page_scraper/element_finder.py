@@ -423,7 +423,7 @@ class Finder:
                     max_images_count = len(images) + int(last_image_count.text.strip("+"))
                     print(f"image count is {max_images_count}")
                 except Exception as exce:
-                    max_images_count = 10
+                    max_images_count = len(images)
                     print(exce)
                 first_url_element = images[0].find_element_by_xpath("./ancestor::a")
                 try:
