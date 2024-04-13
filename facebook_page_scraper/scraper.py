@@ -329,6 +329,7 @@ class Facebook_scraper:
                     "images": image.get('images'),
                     "post_id": image.get('post_id'),
                     "post_url": post_url,
+                    "error": image.get('error'),
                     # NOTE only include the following fields if scraping a page, not tested for groups yet
                     **({"shares": shares} if not self.isGroup else {}),
                     **({"reactions": reactions} if not self.isGroup else {}),

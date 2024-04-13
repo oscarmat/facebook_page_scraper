@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import time
+import traceback
 import urllib.request
 from urllib.parse import urlparse, parse_qs
 
@@ -398,8 +399,25 @@ class Finder:
         return sources
 
     @staticmethod
+    def __get_post_id(url):
+        if '/events' in url:
+            match = re.search(r"/events/(\d+)/", url)
+            return match.group(1) if match else None
+        if '/photo' in url:
+            parsed_url = urlparse(url)
+            # Get the query parameters as a dictionary
+            query_params = parse_qs(parsed_url.query)
+            # Get the value of the 'fbid' query parameter
+            return query_params.get('fbid', [None])[0]
+
+        return None
+
+
+
+    @staticmethod
     def __find_all_image_url(post, layout, driver):
         """finds all image of the facebook post using selenium's webdriver's method"""
+        post_id = None
         try:
             if layout == "old":
                 # find all img tag that looks like <img class="scaledImageFitWidth img" src=""> div > img[referrerpolicy]
@@ -408,16 +426,29 @@ class Finder:
                 )
                 # extract src attribute from all the img tag,store it in list
             elif layout == "new":
-                post_id = None
                 images = post.find_elements(
                     By.CSS_SELECTOR, "div > img[referrerpolicy]"
                 )
 
                 # will open the fb carousel and get all the images
                 driver.set_window_size(1920, 1200)
+
+                photo_viewer_xpath = '//div[@aria-label="Photo Viewer"]'
+
+                # will try to close the carousel if it's open TODO be sure this does work
+                try:
+                    carousel = driver.find_element(By.XPATH, photo_viewer_xpath)
+                    carousel_close_button = carousel.find_element(By.XPATH, '//div[@aria-label="Close"]')
+                    carousel_close_button = carousel_close_button.find_element(By.XPATH, './ancestor::div[@role="banner"]/*[1]')
+                    ActionChains(driver).move_to_element_with_offset(carousel_close_button, 0, 0).click().perform()
+                    time.sleep(3)
+                except Exception as exception:
+                    print("carousel open not found")
+                    print(exception)
+
                 try:
                     parent_element = images[-1].find_element(By.XPATH,
-                                                               "./ancestor::a")
+                                                               './ancestor::a[contains(@href, "/photo")]')
                     last_image_count = parent_element.find_element(By.XPATH,
                                                                "..//div[contains(text(), '+')]")
                     max_images_count = len(images) + int(last_image_count.text.strip("+"))
@@ -425,13 +456,31 @@ class Finder:
                 except Exception as exce:
                     max_images_count = len(images)
                     print(exce)
-                first_url_element = images[0].find_element_by_xpath("./ancestor::a")
+                first_url_element = images[0].find_element_by_xpath('./ancestor::a')
+
+                if '/photo' not in first_url_element.get_attribute('href'):
+                    # the post has no photos, could be an event
+                    print("post doesn't have extra images")
+                    return {
+                        'post_id': Finder.__get_post_id(first_url_element.get_attribute('href')),
+                        'images': [image.get_attribute('src') for image in images],
+                        'error': f"post doesn't have extra images : {first_url_element.get_attribute('href')}"
+                    }
+
                 try:
+                    # wait for a second to have the photo viewer render
+                    WebDriverWait(driver, 20).until(EC.visibility_of(first_url_element));
                     driver.execute_script("arguments[0].scrollIntoView();", first_url_element)
                     ActionChains(driver).move_to_element_with_offset(first_url_element, 0, 0).click().perform()
-                except:
-                    first_url_element = first_url_element.find_element(By.XPATH, '..')
-                    first_url_element.click()
+                except Exception as error:
+                    print("couldn't get the carousel to work")
+                    print(first_url_element.get_attribute('href'))
+                    print(traceback.format_exc())
+                    return {
+                        'images': [image.get_attribute('src') for image in images],
+                        'post_id': Finder.__get_post_id(first_url_element.get_attribute('href')),
+                        'error': traceback.format_exc()
+                    }
 
                 image_carousel_wrapper = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, '//div[@aria-label="Photo Viewer"]')))
                 next_button = image_carousel_wrapper.find_element(
@@ -440,11 +489,7 @@ class Finder:
 
                 if image_carousel_wrapper:
                     if post_id is None:
-                        parsed_url = urlparse(driver.current_url)
-                        # Get the query parameters as a dictionary
-                        query_params = parse_qs(parsed_url.query)
-                        # Get the value of the 'fbid' query parameter
-                        post_id = query_params.get('fbid', [None])[0]
+                        post_id = Finder.__get_post_id(driver.current_url)
 
                 def is_image_loaded(driver, img_element):
                     return driver.execute_script(
@@ -485,7 +530,10 @@ class Finder:
                             next_button = None
                     except Exception as exp:
                         print(exp)
-                        return [image.get_attribute("src") for image in images] if len(images) > 0 else []
+                        return {
+                            'images': [image.get_attribute("src") for image in images] if len(images) > 0 else [],
+                            'post_id': post_id
+                        }
                 return {
                     'images': image_src,
                     'post_id': post_id
@@ -499,7 +547,10 @@ class Finder:
             logger.exception("Error at find_image_url method : {}".format(ex))
             sources = []
 
-        return sources
+        return {
+            'images': sources,
+            'post_id': post_id
+        }
 
     @staticmethod
     def __find_all_posts(driver, layout, isGroup):
