@@ -76,7 +76,7 @@ class Finder:
                 status_link = post.find_element(By.CLASS_NAME, "_5pcq").get_attribute(
                     "href"
                 )
-                print("old link layouut\n")
+                logger.debug("old link layouut\n")
                 # extract out post id from post's url
                 status = Scraping_utilities._Scraping_utilities__extract_id_from_link(
                     status_link
@@ -333,7 +333,7 @@ class Finder:
                     """
                     # Execute the script with the link_element as the argument
                     timestamp = driver.execute_script(js_script, link_element)
-                    print("TIMESTAMP: " + str(timestamp))
+                    logger.debug("TIMESTAMP: " + str(timestamp))
                 elif not isGroup:
                     aria_label_value = link_element.get_attribute("aria-label")
                     timestamp = (
@@ -443,8 +443,8 @@ class Finder:
                     ActionChains(driver).move_to_element_with_offset(carousel_close_button, 0, 0).click().perform()
                     time.sleep(3)
                 except Exception as exception:
-                    print("carousel open not found")
-                    print(exception)
+                    logger.debug("carousel open not found")
+                    logger.debug(exception)
 
                 try:
                     parent_element = images[-1].find_element(By.XPATH,
@@ -452,15 +452,15 @@ class Finder:
                     last_image_count = parent_element.find_element(By.XPATH,
                                                                "..//div[contains(text(), '+')]")
                     max_images_count = len(images) + int(last_image_count.text.strip("+"))
-                    print(f"image count is {max_images_count}")
+                    logger.debug(f"image count is {max_images_count}")
                 except Exception as exce:
                     max_images_count = len(images)
-                    print(exce)
+                    logger.debug(exce)
                 first_url_element = images[0].find_element_by_xpath('./ancestor::a')
 
                 if '/photo' not in first_url_element.get_attribute('href'):
                     # the post has no photos, could be an event
-                    print("post doesn't have extra images")
+                    logger.debug("post doesn't have extra images")
                     return {
                         'post_id': Finder.__get_post_id(first_url_element.get_attribute('href')),
                         'images': [image.get_attribute('src') for image in images],
@@ -473,9 +473,9 @@ class Finder:
                     driver.execute_script("arguments[0].scrollIntoView();", first_url_element)
                     ActionChains(driver).move_to_element_with_offset(first_url_element, 0, 0).click().perform()
                 except Exception as error:
-                    print("couldn't get the carousel to work")
-                    print(first_url_element.get_attribute('href'))
-                    print(traceback.format_exc())
+                    logger.debug("couldn't get the carousel to work")
+                    logger.debug(first_url_element.get_attribute('href'))
+                    logger.debug(traceback.format_exc())
                     return {
                         'images': [image.get_attribute('src') for image in images],
                         'post_id': Finder.__get_post_id(first_url_element.get_attribute('href')),
@@ -499,7 +499,7 @@ class Finder:
 
                 while (next_button is not None) & (len(image_src) < max_images_count):
                     try:
-                        print("waiting for the image to render")
+                        logger.debug("waiting for the image to render")
                         time.sleep(2)
                         try:
                             image = image_carousel_wrapper.find_element(
@@ -517,7 +517,7 @@ class Finder:
                         WebDriverWait(driver, 30).until(lambda driver: is_image_loaded(driver, image))
                         images.append(image)
                         image_src.append(image.get_attribute('src'))
-                        print(f"image url : {image.get_attribute('src')}")
+                        logger.debug(f"image url : {image.get_attribute('src')}")
                         carousel_buttons = image_carousel_wrapper.find_elements(
                             By.XPATH, '//div[@data-name="media-viewer-nav-container"]//div[@data-visualcompletion]'
                         )
@@ -529,7 +529,7 @@ class Finder:
                         else:
                             next_button = None
                     except Exception as exp:
-                        print(exp)
+                        logger.debug(exp)
                         return {
                             'images': [image.get_attribute("src") for image in images] if len(images) > 0 else [],
                             'post_id': post_id
@@ -647,7 +647,7 @@ class Finder:
                 element = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '[aria-label="Close"]')))
                 element.click()  # Click the element
             except Exception as ex:
-                print(f"no pop-up")
+                logger.debug(f"no pop-up")
 
             time.sleep(1)
             #target username

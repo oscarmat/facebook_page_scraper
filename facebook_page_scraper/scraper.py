@@ -4,6 +4,9 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
+
+import ciso8601
 
 from .driver_initialization import Initializer
 from .driver_utilities import Utilities
@@ -81,7 +84,7 @@ class Facebook_scraper:
     def __check_timeout(self, start_time, current_time):
         return (current_time-start_time) > self.timeout
 
-    def scrap_to_json(self):
+    def scrap_to_json(self, minimum_timestamp = None):
         # call the __start_driver and override class member __driver to webdriver's instance
         self.__start_driver()
         starting_time = time.time()
@@ -100,11 +103,12 @@ class Facebook_scraper:
         # scroll down to bottom most
         Utilities._Utilities__scroll_down(self.__driver, self.__layout)
         self.__handle_popup(self.__layout)
-
-        while len(self.__data_dict) < self.posts_count and elements_have_loaded:
+        # timestamp limitation for scraping posts
+        timestamp_edge_hit = False
+        while (not timestamp_edge_hit) and (len(self.__data_dict) < self.posts_count) and elements_have_loaded:
             self.__handle_popup(self.__layout)
             # self.__find_elements(name)
-            self.__find_elements()
+            timestamp_edge_hit = self.__find_elements(minimum_timestamp)
             current_time = time.time()
             if self.__check_timeout(starting_time, current_time) is True:
                 logger.setLevel(logging.INFO)
@@ -198,7 +202,7 @@ class Facebook_scraper:
             # if length of posts is 0,decrement retry by 1
             self.retry -= 1
 
-    def __find_elements(self):
+    def __find_elements(self, minimum_timestamp):
         """find elements of posts and add them to data_dict"""
         all_posts = Finder._Finder__find_all_posts(
             self.__driver, self.__layout, self.isGroup)  # find all posts
@@ -310,11 +314,20 @@ class Facebook_scraper:
                     comments = Finder._Finder__find_comments(post, self.__layout)
                     comments = int(
                         Scraping_utilities._Scraping_utilities__value_to_float(comments))
-                    
+
 
                     # extract time
                     posted_time = Finder._Finder__find_posted_time(
                         post, self.__layout, link_element, self.__driver, self.isGroup)
+
+                    #getting post time and checking for minimum timestamp
+                    if not self.isGroup:
+                        # extract time
+                        if minimum_timestamp:
+                            ts = ciso8601.parse_datetime(posted_time).timestamp()
+                            if ts < int(minimum_timestamp):
+                                # no new posts return true to signal the parent function stop trying to load more posts
+                                return True
 
                     video = Finder._Finder__find_video_url(post)
 
