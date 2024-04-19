@@ -38,7 +38,7 @@ class Initializer:
         browser_option.add_argument('--disable-popup-blocking')
         return browser_option
 
-    def set_driver_for_browser(self, browser_name):
+    def set_driver_for_browser(self, browser_name, path=None):
         """expects browser name and returns a driver instance"""
         logger.setLevel(logging.INFO)
         # if browser is suppose to be chrome
@@ -69,12 +69,12 @@ class Initializer:
                                          options=self.set_properties(browser_option), seleniumwire_options=options)
 
             # automatically installs geckodriver and initialize it and returns the instance
-            return webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=self.set_properties(browser_option))
+            return webdriver.Firefox(executable_path=GeckoDriverManager(path=path).install(), options=self.set_properties(browser_option))
         else:
             # if browser_name is not chrome neither firefox than raise an exception
             raise Exception("Browser not supported!")
 
-    def init(self):
+    def init(self, path):
         """returns driver instance"""
-        driver = self.set_driver_for_browser(self.browser_name)
+        driver = self.set_driver_for_browser(self.browser_name, path=path)
         return driver
