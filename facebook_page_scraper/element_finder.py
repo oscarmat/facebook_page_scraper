@@ -408,7 +408,13 @@ class Finder:
             # Get the query parameters as a dictionary
             query_params = parse_qs(parsed_url.query)
             # Get the value of the 'fbid' query parameter
-            return query_params.get('fbid', [None])[0]
+            post_id = query_params.get('set', [None])[0]
+            if post_id:
+                post_id = post_id.split('.')[1]
+            else:
+                post_id = query_params.get('fbid', [None])[0]
+
+            return post_id
 
         return None
 
