@@ -63,7 +63,7 @@ class Finder:
         return status
 
     @staticmethod
-    def __find_status(post, layout, isGroup):
+    def __find_status(post, layout, isGroup, driver, page_or_group_name):
         """finds URL of the post, then extracts link from that URL and returns it"""
         try:
             link = None
@@ -83,9 +83,52 @@ class Finder:
                 )
             elif layout == "new":
 
-                link = post.find_element(
-                    By.CSS_SELECTOR, 'span > a[role="link"]' if isGroup else 'span > a[aria-label][role="link"]'
-                )
+                try:
+                    link = post.find_element(
+                        By.CSS_SELECTOR,
+                        'span > a[role="link"]' if isGroup else 'span > a[aria-label][role="link"]'
+                    )
+
+                except NoSuchElementException:
+                    # try to hover over the time link
+                    link = post.find_element(
+                        By.CSS_SELECTOR,
+                        'span > a[role="link"]' if isGroup else 'span > a[target="_blank"][role="link"]'
+                    )
+                    actions = ActionChains(driver)
+                    # scroll to the link
+                    scrolling_script = """
+                        const element = arguments[0];
+                        const elementRect = element.getBoundingClientRect();
+                        const absoluteElementTop = elementRect.top + window.pageYOffset;
+                        const middle = absoluteElementTop - (window.innerHeight / 2);
+                        window.scrollTo(0, middle); 
+                    """
+                    driver.execute_script(scrolling_script, link)
+                    driver.execute_script("arguments[0].style.border='2px solid black'", link);
+                    actions.move_to_element(link).perform()
+                    time.sleep(2)
+
+                    # actually not  useful to trigger the hover witht he mouse event
+                    # should be deleted in the future
+                    javaScript = """
+                        var evObj = document.createEvent('MouseEvents');
+                        evObj.initMouseEvent(\"mouseover\",true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                        arguments[0].dispatchEvent(evObj);
+                    """
+                    driver.execute_script(javaScript, link)
+                    try:
+                        link = post.find_element(
+                            By.CSS_SELECTOR,
+                            'span > a[role="link"]' if isGroup else 'span > a[href*="/posts/"][role="link"]'
+                        )
+                    except NoSuchElementException:
+                        postId = Finder._Finder__find_post_id(post, layout)
+                        if postId is not None:
+                            post_url = "https://www.facebook.com/{}/posts/{}".format(page_or_group_name, postId)
+                            print("constructed post Url ")
+                            print(post_url)
+                            return (postId, post_url, link)
                 if link is not None:
                     status_link = link.get_attribute("href")
                     status = Scraping_utilities._Scraping_utilities__extract_id_from_link(
@@ -335,12 +378,29 @@ class Finder:
                     timestamp = driver.execute_script(js_script, link_element)
                     logger.debug("TIMESTAMP: " + str(timestamp))
                 elif not isGroup:
-                    aria_label_value = link_element.get_attribute("aria-label")
+                    # getting the timestamp from teh tooltip after hovering the link
+                    logger.debug("getting timestamp from hovering tooltip")
+                    actions = ActionChains(driver)
+                    scrolling_script = """
+                                            const element = arguments[0];
+                                            const elementRect = element.getBoundingClientRect();
+                                            const absoluteElementTop = elementRect.top + window.pageYOffset;
+                                            const middle = absoluteElementTop - (window.innerHeight / 2);
+                                            window.scrollTo(0, middle); 
+                                        """
+                    driver.execute_script(scrolling_script, link_element)
+                    actions.move_to_element(link_element).perform()
+
+                    parent_element = link_element.find_element_by_xpath("..")
+                    parent_element_described_by=parent_element.get_attribute("aria-describedby")
+                    tooltipElement = driver.find_element(By.CSS_SELECTOR, f"[id*={parent_element_described_by.replace(':', '').replace(':', '')}]")
+                    timestampContent = tooltipElement.get_attribute("innerText")
+                    logger.debug(f"tooltipElement content : {timestampContent}")
                     timestamp = (
-                        parse(aria_label_value).isoformat()
-                        if len(aria_label_value) > 5
+                        parse(timestampContent).isoformat()
+                        if len(timestampContent) > 5
                         else Scraping_utilities._Scraping_utilities__convert_to_iso(
-                            aria_label_value
+                            timestampContent
                         )
                     )
                 return timestamp
@@ -395,6 +455,34 @@ class Finder:
         except Exception as ex:
             logger.exception("Error at find_image_url method : {}".format(ex))
             sources = []
+
+        return sources
+
+    @staticmethod
+    def __find_post_id(post, layout):
+        """finds all image of the facebook post using selenium's webdriver's method"""
+        try:
+            if layout == "old":
+                # find all img tag that looks like <img class="scaledImageFitWidth img" src=""> div > img[referrerpolicy]
+                images = post.find_elements(
+                    By.CSS_SELECTOR, "img.scaledImageFitWidth.img"
+                )
+                # extract src attribute from all the img tag,store it in list
+            elif layout == "new":
+                images = post.find_elements(
+                    By.CSS_SELECTOR, "a[href*='/photo/']"
+                )
+                if(len(images) > 0):
+                    url = images[0].get_attribute("href")
+                    return Finder.__get_post_id(url)
+                else:
+                    return None
+        except NoSuchElementException:
+            sources = None
+            pass
+        except Exception as ex:
+            logger.exception("Error at find_image_url method : {}".format(ex))
+            sources = None
 
         return sources
 
