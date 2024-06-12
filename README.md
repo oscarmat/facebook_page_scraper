@@ -72,6 +72,25 @@ python3 setup.py install
 pip3 install facebook-page-scraper
 ```
 
+Or, to install this latest master branch:
+
+```sh
+pip install git+https://github.com/moda20/facebook_page_scraper.git@master
+```
+
+Or, to force update the branch after an update : 
+
+```sh
+pip install --force-reinstall --no-deps git+https://github.com/moda20/facebook_page_scraper.git@master
+```
+
+And to add it to your requirements.txt manually : 
+
+```
+facebook-page-scraper @ git+https://github.com/moda20/facebook_page_scraper.git@master
+```
+
+
 <br>
 <hr>
 <h2 id="instantiation"> How to use? </h2>
