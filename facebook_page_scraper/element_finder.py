@@ -84,6 +84,9 @@ class Finder:
             elif layout == "new":
 
                 try:
+                    # try to scroll to the start of the post
+                    driver.execute_script("arguments[0].scrollIntoView({ block: 'center', inline: 'center'});", post)
+
                     link = post.find_element(
                         By.CSS_SELECTOR,
                         'span > a[role="link"]' if isGroup else 'span > a[aria-label][role="link"]'
@@ -687,8 +690,12 @@ class Finder:
                 name = driverOrPost.find_element(By.TAG_NAME, "strong")
             url = None
             if name is not None:
-                url_elem = name.find_element(By.XPATH, "./ancestor::a")
-                url = url_elem.get_attribute('href')
+                try:
+                    url_elem = name.find_element(By.XPATH, "./ancestor::a")
+                    url = url_elem.get_attribute('href')
+                except NoSuchElementException:
+                    url_elem = name.find_element(By.XPATH, ".//a")
+                    url = url_elem.get_attribute('href')
             return {
                 'name' : name.get_attribute(
                     "textContent"
