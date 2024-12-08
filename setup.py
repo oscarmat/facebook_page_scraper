@@ -4,9 +4,9 @@ with open("README.md", "r", encoding="utf-8") as file:
     long_description = file.read()
 
 requirements = ['selenium==4.27.1',
-                'webdriver-manager==3.8.0',
+                'webdriver-manager==4.0.2',
                 'selenium-wire==5.1.0',
-                'python-dateutil==2.8.2']
+                'python-dateutil==2.9.0.post0']
 
 
 setuptools.setup(
