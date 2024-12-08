@@ -4,6 +4,7 @@ from seleniumwire import webdriver
 # to add capabilities for chrome and firefox, import their Options with different aliases
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 # import webdriver for downloading respective driver for the browser
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
@@ -60,7 +61,7 @@ class Initializer:
                 return webdriver.Chrome(executable_path=ChromeDriverManager().install(),
                                         options=self.set_properties(browser_option), seleniumwire_options=options)
 
-            return webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=self.set_properties(browser_option))
+            return webdriver.Chrome(service=ChromeService(ChromeDriverManager().install(), options=self.set_properties(browser_option)))
         elif browser_name.lower() == "firefox":
             browser_option = FirefoxOptions()
             if self.proxy is not None:
